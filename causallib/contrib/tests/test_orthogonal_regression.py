@@ -5,7 +5,7 @@ from scipy.special import expit
 
 from sklearn.linear_model import LinearRegression, LogisticRegression
 
-from ..orthogonal_regression.orthogonal_regression import OrthogonalRegression
+from causallib.contrib.orthogonal_regression import OrthogonalRegression
 
 
 def generate_two_step_sim(

@@ -1,1 +1,1 @@
-from orthogonal_regression import OrthogonalRegression
+from .orthogonal_regression import OrthogonalRegression
