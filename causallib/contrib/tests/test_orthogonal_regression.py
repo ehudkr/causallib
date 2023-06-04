@@ -154,6 +154,9 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(model.covariate_models_[3]["x_1"].coef_.size, 3)  # baseline + treatment + t-1
         self.assertEqual(model.covariate_models_[4]["x_1"].coef_.size, 3)  # baseline + treatment + t-1
 
+        Xt = model.transform(X, a)
+        self.assertTupleEqual(Xt.shape, (1000, 1 + 3 + 4))  # baseline + X_t + a_t
+
     def test_fit_without_baseline_x(self):
         X, a, y = generate_multi_step_sim(with_baseline=False)
         X, a = X.reset_index(), a.reset_index()
@@ -168,6 +171,9 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(model.covariate_models_[2]["x_1"].coef_.size, 1)  # treatment
         self.assertEqual(model.covariate_models_[3]["x_1"].coef_.size, 2)  # treatment + t-1
         self.assertEqual(model.covariate_models_[4]["x_1"].coef_.size, 2)  # treatment + t-1
+
+        Xt = model.transform(X, a)
+        self.assertTupleEqual(Xt.shape, (1000, 3 + 4))  # X_t + a_t
 
     def test_intercept_only_model(self):
         X, a, y = generate_multi_step_sim(with_baseline=False, with_step1=True)
@@ -190,6 +196,9 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(model.covariate_models_[2]["x_1"].fit_intercept, True)
         self.assertEqual(model.covariate_models_[3]["x_1"].coef_.size, 2)  # treatment + t-1
         self.assertEqual(model.covariate_models_[4]["x_1"].coef_.size, 2)  # treatment + t-1
+
+        Xt = model.transform(X, a)
+        self.assertTupleEqual(Xt.shape, (1000, 4 + 4))  # X_t (with step1) + a_t
 
     def test_intercept_data(self):
         X, a, y = generate_multi_step_sim(with_baseline=False, with_step1=True)
@@ -224,6 +233,9 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(model.covariate_models_[2]["x_1"].coef_.size, 3)  # baseline + A_t-1 + X_t-1
         self.assertEqual(model.covariate_models_[3]["x_1"].coef_.size, 5)  # baseline + A_t-1 + A_t-2 + X_t-1 + X_t-2
         self.assertEqual(model.covariate_models_[4]["x_1"].coef_.size, 5)  # baseline + A_t-1 + A_t-2 + X_t-1 + X_t-2
+
+        Xt = model.transform(X, a)
+        self.assertTupleEqual(Xt.shape, (1000, 1 + 4 + 4))  # baseline + X_t (with step1) + a_t
 
     def test_compare_to_naive_regression(self):
         import statsmodels.api as sm
@@ -294,6 +306,7 @@ class MyTestCase(unittest.TestCase):
             param_grid={
                 "n_estimators": [5, 10, 20]
             },
+            cv=3,  # Save some redundant CPU cycles
             refit=True,
         )
 
@@ -306,6 +319,7 @@ class MyTestCase(unittest.TestCase):
             )
             model.fit(X, a)
             Xt = model.transform(X, a)
+            self.assertTupleEqual(Xt.shape, (1000, 1 + 4 + 4))  # baseline + X_t (with step1) + a_t
 
         with self.subTest("No baseline, intercept"):
             X, a, y = generate_multi_step_sim(with_baseline=False, with_step1=True)
@@ -316,8 +330,7 @@ class MyTestCase(unittest.TestCase):
             )
             model.fit(X, a)
             Xt = model.transform(X, a)
-
-        self.assertEqual(True, False)
+            self.assertTupleEqual(Xt.shape, (1000, 4 + 4))  # X_t (with step1) + a_t
 
     def test_binary_covariate(self):
         with self.subTest("With baseline:"):
@@ -361,6 +374,7 @@ class MyTestCase(unittest.TestCase):
             self.assertEqual(model.covariate_models_[2]["x_1"].coef_.size, 2)  # treatment + t-1
             self.assertEqual(model.covariate_models_[2]["x_1"].fit_intercept, True)
             Xt = model.transform(X, a)
+            self.assertTupleEqual(Xt.shape, (1000, 4 + 4))  # X_t (with step1) + a_t
 
     def test_estimator_predict_binary(self):
         X, a, y = generate_multi_step_sim(
