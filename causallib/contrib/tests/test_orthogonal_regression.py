@@ -78,6 +78,7 @@ def generate_multi_step_sim(
     rho_xba=0.25,
     with_step1=False,
     with_baseline=False,
+    bin_x=False,
     seed=0,
 ):
     rng = np.random.default_rng(seed)
@@ -89,7 +90,8 @@ def generate_multi_step_sim(
     X = {}
     A = {}
     if with_step1:
-        X[1] = rho_ux * U + rho_xbx * Xb + np.sqrt(1 - rho_ux**2 - rho_xbx**2) * rng.normal(size=n)
+        X_t = rho_ux * U + rho_xbx * Xb + np.sqrt(1 - rho_ux**2 - rho_xbx**2) * rng.normal(size=n)
+        X[1] = rng.binomial(n=1, p=expit(X_t)) if bin_x else X_t
         # A_1 = 2*((X_1 > 0) - .5)
         A[1] = rho_xa * X[1] + rho_xba * Xb + np.sqrt(1 - rho_xa**2 - rho_xba**2) * rng.normal(size=n)
     else:
@@ -102,6 +104,7 @@ def generate_multi_step_sim(
             + rho_xbx * Xb
             + np.sqrt(1 - rho_ax ** 2 - rho_ux ** 2 - rho_xbx ** 2) * rng.normal(size=n)
         )
+        X_t = rng.binomial(n=1, p=expit(X_t)) if bin_x else X_t
         A_t = rho_xa * X_t + rho_xba * Xb + np.sqrt(1 - rho_xa ** 2 - rho_xba**2) * rng.normal(size=n)
         X[t] = X_t
         A[t] = A_t
@@ -184,6 +187,7 @@ class MyTestCase(unittest.TestCase):
             ["intercept"]
         )
         self.assertEqual(model.covariate_models_[2]["x_1"].coef_.size, 2)  # treatment + t-1
+        self.assertEqual(model.covariate_models_[2]["x_1"].fit_intercept, True)
         self.assertEqual(model.covariate_models_[3]["x_1"].coef_.size, 2)  # treatment + t-1
         self.assertEqual(model.covariate_models_[4]["x_1"].coef_.size, 2)  # treatment + t-1
 
@@ -315,6 +319,70 @@ class MyTestCase(unittest.TestCase):
 
         self.assertEqual(True, False)
 
+    def test_binary_covariate(self):
+        with self.subTest("With baseline:"):
+            X, a, y = generate_multi_step_sim(
+                with_baseline=True, with_step1=False, bin_x=True
+            )
+            X, a = X.reset_index(), a.reset_index()
+            model = OrthogonalRegression(
+                covariate_models={"x_1": LogisticRegression()},
+                id_col="id", time_col="t",
+            )
+            model.fit(X, a)
+            self.assertSetEqual(set(model.covariate_models_.keys()), {2, 3, 4})
 
-if __name__ == '__main__':
-    unittest.main()
+            Xt = model.transform(X, a)
+            for col in Xt.filter(regex="x_1", axis=1):
+                min_resid = Xt[col].min()
+                max_resid = Xt[col].max()
+                self.assertGreater(min_resid, -1)
+                self.assertGreater(1, max_resid)
+
+        with self.subTest("Intercept data"):
+            X, a, y = generate_multi_step_sim(
+                with_baseline=False, with_step1=True, bin_x=True
+            )
+            X, a = X.reset_index(), a.reset_index()
+            model = OrthogonalRegression(
+                covariate_models={"x_1": LogisticRegression()},
+                id_col="id", time_col="t",
+            )
+            model.fit(X, a)
+
+            self.assertSetEqual(set(model.covariate_models_.keys()), {1, 2, 3, 4})
+            self.assertSetEqual(set(model.covariate_models_[1].keys()), {"x_1"})
+            self.assertEqual(model.covariate_models_[1]["x_1"].coef_.size, 1)  # intercept
+            self.assertEqual(model.covariate_models_[1]["x_1"].fit_intercept, False)
+            self.assertListEqual(
+                model.covariate_models_[1]["x_1"].feature_names_in_.tolist(),
+                ["intercept"]
+            )
+            self.assertEqual(model.covariate_models_[2]["x_1"].coef_.size, 2)  # treatment + t-1
+            self.assertEqual(model.covariate_models_[2]["x_1"].fit_intercept, True)
+            Xt = model.transform(X, a)
+
+    def test_estimator_predict_binary(self):
+        X, a, y = generate_multi_step_sim(
+            with_baseline=False, with_step1=True, bin_x=True,
+            steps=1,
+        )
+        X, a = X.reset_index(), a.reset_index()
+        model = OrthogonalRegression(
+            covariate_models={"x_1": LogisticRegression(random_state=0)},
+            id_col="id", time_col="t",
+        )
+        model.fit(X, a)
+        test_X = model._create_intercept_data(index=X["id"])
+        x1_model = model.covariate_models_[1]["x_1"]
+        y_pred = model._OrthogonalRegression__estimator_predict(x1_model, test_X)
+        expected_y_pred = LogisticRegression(
+            random_state=0,
+        ).fit(test_X, X["x_1"]).predict_proba(test_X)[:, 1]  # binary
+        np.testing.assert_array_almost_equal(y_pred, expected_y_pred, decimal=4)
+        with self.assertRaises(AssertionError):
+            np.testing.assert_array_almost_equal(y_pred, 1 - expected_y_pred, decimal=4)
+
+#
+# if __name__ == '__main__':
+#     unittest.main()

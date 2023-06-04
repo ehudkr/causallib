@@ -135,7 +135,7 @@ class OrthogonalRegression:
     @staticmethod
     def __estimator_predict(estimator, X):
         try:
-            return estimator.predict_proba(X)
+            return estimator.predict_proba(X)[:, -1]
         except AttributeError:
             return estimator.predict(X)
 
