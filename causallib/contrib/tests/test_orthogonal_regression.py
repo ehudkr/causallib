@@ -283,6 +283,48 @@ class MyTestCase(unittest.TestCase):
             self.assertAlmostEqual(worst_naive, 0, places=1)
         # TODO: why does last `A` has the same coefficient?
 
+    def test_residualizing_treatment_improves_precision(self):
+        import statsmodels.api as sm
+        def generate_simple_data(n=1000, seed=0):
+            rng = np.random.default_rng(seed)
+            U = rng.normal(size=n)
+            A_1 = rng.normal(size=n)
+            X_2 = 0.8 * A_1 + 0.5 * U + rng.normal(scale=np.sqrt(1 - 0.8**2 - 0.5**2), size=n)
+            A_2 = 0.5 * X_2 + rng.normal(scale=np.sqrt(1 - 0.5**2), size=n)
+            X = pd.concat({2: pd.Series(X_2)}, names=["t", "id"]).to_frame().add_prefix("x_")
+            A = pd.concat({1: pd.Series(A_1), 2: pd.Series(A_2)}, names=["t", "id"]).rename("a")
+            Y = U + X_2 + rng.normal(loc=0.5, size=n)  # A_1 + A_2 +
+            Y = pd.Series(Y).rename("y")
+            return X, A, Y
+
+        X, a, y = generate_simple_data(10000)
+        X, a = X.reset_index(), a.reset_index()
+        model_X = OrthogonalRegression(
+            covariate_models={"x_0": LinearRegression()},
+            id_col="id", time_col="t",
+        )
+        model_X.fit(X, a)
+        Xta = model_X.transform(X, a)
+
+        Xa = pd.merge(X, a, on=["id", "t"], how="outer")
+        empty_a = Xa[["t", "id"]]
+        model_Xa = OrthogonalRegression(
+            covariate_models={
+                "x_0": LinearRegression(),
+                "a": LinearRegression(),
+            },
+            id_col="id", time_col="t",
+        )
+        model_Xa.fit(Xa, empty_a)
+        Xat = model_Xa.transform(Xa, empty_a)
+
+        assert Xta.shape == Xat.shape
+
+        m_regular_a = sm.OLS(y, sm.add_constant(Xta)).fit()
+        m_ortho_a = sm.OLS(y, sm.add_constant(Xat)).fit()
+
+        print("a")
+
     def test_unseen_time_steps(self):
         X, a, y = generate_multi_step_sim(with_baseline=True, with_step1=True)
         X, a = X.reset_index(), a.reset_index()
