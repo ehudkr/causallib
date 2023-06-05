@@ -278,9 +278,9 @@ class MyTestCase(unittest.TestCase):
         worst_ortho = m_ortho.params.filter(like="a", axis="index").abs().max()
         worst_naive = m_naive.params.filter(like="a", axis="index").abs().max()
         self.assertGreater(worst_naive, worst_ortho * 10)
-        self.assertAlmostEquals(worst_ortho, 0, places=1)
+        self.assertAlmostEqual(worst_ortho, 0, places=1)
         with self.assertRaises(AssertionError):
-            self.assertAlmostEquals(worst_naive, 0, places=1)
+            self.assertAlmostEqual(worst_naive, 0, places=1)
         # TODO: why does last `A` has the same coefficient?
 
     def test_unseen_time_steps(self):
