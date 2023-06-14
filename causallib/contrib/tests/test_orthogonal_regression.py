@@ -207,7 +207,7 @@ class MyTestCase(unittest.TestCase):
             covariate_models={"x_1": LinearRegression()},
             id_col="id", time_col="t",
         )
-        cur_y = model._get_target(Xa, "x_1", 1)
+        cur_y = model._get_targets(Xa, 1)["x_1"]
         pd.testing.assert_series_equal(
             cur_y, X.xs(1, level="t")["x_1"]
         )
