@@ -93,7 +93,7 @@ class OrthogonalRegression:
         """
         # TODO: check for match between self.covariate_models.keys() and X.columns?
         models = defaultdict(dict)  # TODO: should index by either time/cov first or even by tuple?
-        Xa = X.merge(a, on=["id", "t"], how="outer")
+        Xa, Y = self._prepare_data(X, a, y)
         # a-priori merging saves some duplicated wrangling, but creates edge cases (e.g., all-null predictors/targets)
         time_points = sorted(Xa[self.time_col].unique())
         for time_point in time_points:
@@ -117,6 +117,26 @@ class OrthogonalRegression:
         self.covariate_models_ = models
         return self
 
+    # TODO: maybe do "create data" which will build a multivariate (i.e. multioutput) time-pooled data X, y.
+    #       Then decide whether to model x_j,t separately (as now), pool time together for each covariate,
+    #       do multivariate model (across x_j) at each timepoint separately, or both.
+
+    def _prepare_data(self, X, a, y=None):
+        Xa = X.merge(a, on=["id", "t"], how="outer")
+        # a-priori merging saves some duplicated wrangling, but creates edge cases (e.g., all-null predictors/targets)
+        time_points = sorted(Xa[self.time_col].unique())
+        design_X, design_Y = {}, {}
+        for time_point in time_points:
+            cur_Y = self._get_targets(Xa, time_point)
+            if cur_Y.isna().all().all():
+                continue
+            cur_Xa = self._get_predictors(Xa, time_point, cur_Y.index)
+            design_Y[time_point] = cur_Y
+            design_X[time_point] = cur_Xa
+        design_X = pd.concat(design_X, names=[self.time_col])
+        design_Y = pd.concat(design_Y, names=[self.time_col])
+        return design_X, design_Y
+
     def _get_predictors(self, Xa, time_point, index, covariate=None):
         """Extracts the predictors matrix for a given time.
         `index` is required in case an empty set of predictors is defined and
@@ -130,14 +150,15 @@ class OrthogonalRegression:
             cur_Xa = self._create_intercept_data(index)
         return cur_Xa
 
-    def _get_target(self, Xa, covariate, time_point):
+    def _get_targets(self, Xa, time_point):
         """Extracts the prediction outcome at a given time."""
         # cur_y = Xa.loc[Xa[self.time_col] == time_point, [self.id_col, covariate]]
         # cur_y = cur_y.set_index(self.id_col)[covariate]  # Remove column dimension
+        modeled_covariates = list(self.covariate_models.keys())
         cur_y = (
             Xa.set_index([self.time_col, self.id_col])
-            .xs(time_point, level=self.time_col)[covariate]
-        )
+            .xs(time_point, level=self.time_col)
+        )[modeled_covariates]
         return cur_y
 
     def _long_to_wide(self, cur_Xa, dropna=True):
@@ -145,11 +166,20 @@ class OrthogonalRegression:
         `dropna` is used to drop entirely empty columns
         (no information for some covariate at specific time)."""
         cur_Xa = cur_Xa.pivot(index=self.id_col, columns=self.time_col)
+        # Convert absolute time to delta time from current time-point:
+        # Example: if absolute times are [2, 3] map to delta time [t-2, t-1]
+        level_values = cur_Xa.columns.unique(level=self.time_col)
+        level_values = level_values - level_values.min() + 1
+        level_values = level_values[::-1]
+        if not level_values.empty:
+            # `set_levels` crashes for empty Index
+            cur_Xa.columns.set_levels(level_values, level=self.time_col, inplace=True)
         cur_Xa.columns = [f"{c[0]}__{c[1]}" for c in cur_Xa.columns.to_flat_index()]
         if dropna:
             # No data for covariate, probably due to outer merge:
             cur_Xa = cur_Xa.dropna(axis="columns", how="all")
-        cur_Xa = cur_Xa.T.drop_duplicates(keep="first").T  # Repeated baseline columns
+        # Remove repeated baseline columns; "last" will always take t-1.
+        cur_Xa = cur_Xa.T.drop_duplicates(keep="last").T
         # TODO: also remove time-point suffix in col name?
         # TODO: alternatively, pass another optional X_baseline instead of duplicating in person-time format
         return cur_Xa
