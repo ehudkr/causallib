@@ -162,21 +162,25 @@ class OrthogonalRegression:
         )[modeled_covariates]
         return cur_y
 
-    def _long_to_wide(self, cur_Xa, dropna=True):
+    def _long_to_wide(self, cur_Xa, dropna=True, abst2deltat=True):
         """Transforms long person-time format to wide format indexed by person.
         `dropna` is used to drop entirely empty columns
-        (no information for some covariate at specific time)."""
+        (no information for some covariate at specific time).
+        `abst2deltat` converts absolute time to delta time,
+        this is required for proper column naming during `fit`,
+        but can be redundant when transforming."""
         cur_Xa = cur_Xa.pivot(index=self.id_col, columns=self.time_col)
-        # Convert absolute time to delta time from current time-point:
-        # Example: if absolute times are [2, 3] map to delta time [t-2, t-1]
-        level_values = cur_Xa.columns.unique(level=self.time_col)
-        level_values = level_values - level_values.min() + 1
-        level_values = level_values[::-1]
-        if not level_values.empty:
-            # `set_levels` crashes for empty Index
-            cur_Xa.columns = cur_Xa.columns.set_levels(
-                level_values, level=self.time_col
-            )
+        if abst2deltat:
+            # Convert absolute time to delta time from current time-point:
+            # Example: if absolute times are [2, 3] map to delta time [t-2, t-1]
+            level_values = cur_Xa.columns.unique(level=self.time_col)
+            level_values = level_values - level_values.min() + 1
+            level_values = level_values[::-1]
+            if not level_values.empty:
+                # `set_levels` crashes for empty Index
+                cur_Xa.columns = cur_Xa.columns.set_levels(
+                    level_values, level=self.time_col
+                )
         cur_Xa.columns = [f"{c[0]}__{c[1]}" for c in cur_Xa.columns.to_flat_index()]
         if dropna:
             # No data for covariate, probably due to outer merge:
@@ -191,7 +195,7 @@ class OrthogonalRegression:
         """Main logic for orthogonalizing the time-varying covariates.
         Returns `X` and `a` combined in a long-format."""
         Xa, Y = self._prepare_data(X, a, y)
-        res =  X.merge(a, on=["id", "t"], how="outer")
+        res = X.merge(a, on=["id", "t"], how="outer")
         time_points = Xa.index.unique(level=self.time_col).sort_values()
         for time in time_points:
             for covariate in self.covariate_models.keys():
@@ -238,7 +242,7 @@ class OrthogonalRegression:
             pd.DataFrame: wide-format orthogonalized data.
         """
         res = self._orthogonalize(X, a, y)
-        res = self._long_to_wide(res)
+        res = self._long_to_wide(res, abst2deltat=False)
         return res
 
     @staticmethod
