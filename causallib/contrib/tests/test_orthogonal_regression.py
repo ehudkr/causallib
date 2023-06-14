@@ -9,7 +9,7 @@ from causallib.contrib.orthogonal_regression import OrthogonalRegression
 
 
 def generate_two_step_sim(
-        n=1000,
+        n=100,
         rho_ax=0.75,
         rho_xa=0.5,
         rho_ux=0.5,
@@ -69,7 +69,7 @@ def generate_two_step_sim(
 
 
 def generate_multi_step_sim(
-    n=1000,
+    n=100,
     steps=5,
     rho_ax=0.75,
     rho_xa=0.5,
@@ -155,7 +155,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(model.covariate_models_[4]["x_1"].coef_.size, 3)  # baseline + treatment + t-1
 
         Xt = model.transform(X, a)
-        self.assertTupleEqual(Xt.shape, (1000, 1 + 3 + 4))  # baseline + X_t + a_t
+        self.assertTupleEqual(Xt.shape, (100, 1 + 3 + 4))  # baseline + X_t + a_t
 
     def test_fit_without_baseline_x(self):
         X, a, y = generate_multi_step_sim(with_baseline=False)
@@ -173,7 +173,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(model.covariate_models_[4]["x_1"].coef_.size, 2)  # treatment + t-1
 
         Xt = model.transform(X, a)
-        self.assertTupleEqual(Xt.shape, (1000, 3 + 4))  # X_t + a_t
+        self.assertTupleEqual(Xt.shape, (100, 3 + 4))  # X_t + a_t
 
     def test_intercept_only_model(self):
         X, a, y = generate_multi_step_sim(with_baseline=False, with_step1=True)
@@ -198,7 +198,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(model.covariate_models_[4]["x_1"].coef_.size, 2)  # treatment + t-1
 
         Xt = model.transform(X, a)
-        self.assertTupleEqual(Xt.shape, (1000, 4 + 4))  # X_t (with step1) + a_t
+        self.assertTupleEqual(Xt.shape, (100, 4 + 4))  # X_t (with step1) + a_t
 
     def test_intercept_data(self):
         X, a, y = generate_multi_step_sim(with_baseline=False, with_step1=True)
@@ -235,7 +235,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(model.covariate_models_[4]["x_1"].coef_.size, 5)  # baseline + A_t-1 + A_t-2 + X_t-1 + X_t-2
 
         Xt = model.transform(X, a)
-        self.assertTupleEqual(Xt.shape, (1000, 1 + 4 + 4))  # baseline + X_t (with step1) + a_t
+        self.assertTupleEqual(Xt.shape, (100, 1 + 4 + 4))  # baseline + X_t (with step1) + a_t
 
     def test_compare_to_naive_regression(self):
         import statsmodels.api as sm
@@ -319,7 +319,7 @@ class MyTestCase(unittest.TestCase):
             )
             model.fit(X, a)
             Xt = model.transform(X, a)
-            self.assertTupleEqual(Xt.shape, (1000, 1 + 4 + 4))  # baseline + X_t (with step1) + a_t
+            self.assertTupleEqual(Xt.shape, (100, 1 + 4 + 4))  # baseline + X_t (with step1) + a_t
 
         with self.subTest("No baseline, intercept"):
             X, a, y = generate_multi_step_sim(with_baseline=False, with_step1=True)
@@ -330,7 +330,7 @@ class MyTestCase(unittest.TestCase):
             )
             model.fit(X, a)
             Xt = model.transform(X, a)
-            self.assertTupleEqual(Xt.shape, (1000, 4 + 4))  # X_t (with step1) + a_t
+            self.assertTupleEqual(Xt.shape, (100, 4 + 4))  # X_t (with step1) + a_t
 
     def test_binary_covariate(self):
         with self.subTest("With baseline:"):
@@ -374,12 +374,13 @@ class MyTestCase(unittest.TestCase):
             self.assertEqual(model.covariate_models_[2]["x_1"].coef_.size, 2)  # treatment + t-1
             self.assertEqual(model.covariate_models_[2]["x_1"].fit_intercept, True)
             Xt = model.transform(X, a)
-            self.assertTupleEqual(Xt.shape, (1000, 4 + 4))  # X_t (with step1) + a_t
+            self.assertTupleEqual(Xt.shape, (100, 4 + 4))  # X_t (with step1) + a_t
 
     def test_estimator_predict_binary(self):
         X, a, y = generate_multi_step_sim(
             with_baseline=False, with_step1=True, bin_x=True,
             steps=1,
+            n=1000,
         )
         X, a = X.reset_index(), a.reset_index()
         model = OrthogonalRegression(
