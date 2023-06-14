@@ -173,7 +173,9 @@ class OrthogonalRegression:
         level_values = level_values[::-1]
         if not level_values.empty:
             # `set_levels` crashes for empty Index
-            cur_Xa.columns.set_levels(level_values, level=self.time_col, inplace=True)
+            cur_Xa.columns = cur_Xa.columns.set_levels(
+                level_values, level=self.time_col
+            )
         cur_Xa.columns = [f"{c[0]}__{c[1]}" for c in cur_Xa.columns.to_flat_index()]
         if dropna:
             # No data for covariate, probably due to outer merge:
