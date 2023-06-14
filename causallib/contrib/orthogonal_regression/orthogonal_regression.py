@@ -95,15 +95,16 @@ class OrthogonalRegression:
         models = defaultdict(dict)  # TODO: should index by either time/cov first or even by tuple?
         Xa, Y = self._prepare_data(X, a, y)
         # a-priori merging saves some duplicated wrangling, but creates edge cases (e.g., all-null predictors/targets)
-        time_points = sorted(Xa[self.time_col].unique())
+        time_points = Xa.index.unique(level=self.time_col).sort_values()
         for time_point in time_points:
             for covariate in self.covariate_models.keys():
-                cur_y = self._get_target(Xa, covariate, time_point)
+                cur_y = Y.xs(time_point, level=self.time_col)[covariate]
                 if cur_y.isna().all():
                     # No data for `covariate` at this time-point.
                     # Was probably added in the "outer" merge of `X` and `a`.
                     break
-                cur_Xa = self._get_predictors(Xa, time_point, cur_y.index, covariate)
+                cur_Xa = Xa.xs(time_point, level=self.time_col)
+                cur_Xa = cur_Xa.dropna(axis="columns", how="all")
                 cur_model = deepcopy(self.covariate_models[covariate])
                 if self._is_intercept_data(cur_Xa):
                     try:
@@ -189,16 +190,17 @@ class OrthogonalRegression:
     def _orthogonalize(self, X, a, y=None):
         """Main logic for orthogonalizing the time-varying covariates.
         Returns `X` and `a` combined in a long-format."""
-        Xa = X.merge(a, on=["id", "t"], how="outer")
-        res = Xa.copy()
-        time_points = sorted(Xa[self.time_col].unique())
+        Xa, Y = self._prepare_data(X, a, y)
+        res =  X.merge(a, on=["id", "t"], how="outer")
+        time_points = Xa.index.unique(level=self.time_col).sort_values()
         for time in time_points:
             for covariate in self.covariate_models.keys():
                 # TODO: then maybe change the structure to dict of tuple: estimator, rather than nested dict?
-                cur_y = self._get_target(Xa, covariate, time)
+                cur_y = Y.xs(time, level=self.time_col)[covariate]
                 if cur_y.isna().all():
                     break
-                cur_Xa = self._get_predictors(Xa, time, cur_y.index)
+                cur_Xa = Xa.xs(time, level=self.time_col)
+                cur_Xa = cur_Xa.dropna(axis="columns", how="all")
                 cur_model = self.covariate_models_.get(time, {}).get(covariate)
                 if cur_model is None:
                     raise ValueError(
