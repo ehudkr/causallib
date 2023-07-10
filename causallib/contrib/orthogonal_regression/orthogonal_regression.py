@@ -96,8 +96,8 @@ class OrthogonalRegression:
         Xa, Y = self._prepare_data(X, a, y)
         # a-priori merging saves some duplicated wrangling, but creates edge cases (e.g., all-null predictors/targets)
         time_points = Xa.index.unique(level=self.time_col).sort_values()
-        for time_point in time_points:
-            for covariate in self.covariate_models.keys():
+        for covariate in self.covariate_models.keys():
+            for time_point in time_points:
                 cur_y = Y.xs(time_point, level=self.time_col)[covariate]
                 if cur_y.isna().all():
                     # No data for `covariate` at this time-point.
@@ -197,8 +197,8 @@ class OrthogonalRegression:
         Xa, Y = self._prepare_data(X, a, y)
         res = X.merge(a, on=["id", "t"], how="outer")
         time_points = Xa.index.unique(level=self.time_col).sort_values()
-        for time in time_points:
-            for covariate in self.covariate_models.keys():
+        for covariate in self.covariate_models.keys():
+            for time in time_points:
                 # TODO: then maybe change the structure to dict of tuple: estimator, rather than nested dict?
                 cur_y = Y.xs(time, level=self.time_col)[covariate]
                 if cur_y.isna().all():
