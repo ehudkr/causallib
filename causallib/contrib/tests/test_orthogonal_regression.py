@@ -148,11 +148,11 @@ class MyTestCase(unittest.TestCase):
         )
         model.fit(X, a)
 
-        self.assertSetEqual(set(model.covariate_models_.keys()), {2, 3, 4})
-        self.assertSetEqual(set(model.covariate_models_[2].keys()), {"x_1"})  # `x_0` not modeled)
-        self.assertEqual(model.covariate_models_[2]["x_1"].coef_.size, 2)  # baseline + treatment
-        self.assertEqual(model.covariate_models_[3]["x_1"].coef_.size, 3)  # baseline + treatment + t-1
-        self.assertEqual(model.covariate_models_[4]["x_1"].coef_.size, 3)  # baseline + treatment + t-1
+        self.assertSetEqual(set(model.covariate_models_.keys()), {"x_1"})  # `x_0` not modeled)
+        self.assertSetEqual(set(model.covariate_models_["x_1"].keys()), {2, 3, 4})
+        self.assertEqual(model.covariate_models_["x_1"][2].coef_.size, 2)  # baseline + treatment
+        self.assertEqual(model.covariate_models_["x_1"][3].coef_.size, 3)  # baseline + treatment + t-1
+        self.assertEqual(model.covariate_models_["x_1"][4].coef_.size, 3)  # baseline + treatment + t-1
 
         Xt = model.transform(X, a)
         self.assertTupleEqual(Xt.shape, (100, 1 + 3 + 4))  # baseline + X_t + a_t
@@ -166,11 +166,11 @@ class MyTestCase(unittest.TestCase):
         )
         model.fit(X, a)
 
-        self.assertSetEqual(set(model.covariate_models_.keys()), {2, 3, 4})
-        self.assertSetEqual(set(model.covariate_models_[2].keys()), {"x_1"})
-        self.assertEqual(model.covariate_models_[2]["x_1"].coef_.size, 1)  # treatment
-        self.assertEqual(model.covariate_models_[3]["x_1"].coef_.size, 2)  # treatment + t-1
-        self.assertEqual(model.covariate_models_[4]["x_1"].coef_.size, 2)  # treatment + t-1
+        self.assertSetEqual(set(model.covariate_models_.keys()), {"x_1"})
+        self.assertSetEqual(set(model.covariate_models_["x_1"].keys()), {2, 3, 4})
+        self.assertEqual(model.covariate_models_["x_1"][2].coef_.size, 1)  # treatment
+        self.assertEqual(model.covariate_models_["x_1"][3].coef_.size, 2)  # treatment + t-1
+        self.assertEqual(model.covariate_models_["x_1"][4].coef_.size, 2)  # treatment + t-1
 
         Xt = model.transform(X, a)
         self.assertTupleEqual(Xt.shape, (100, 3 + 4))  # X_t + a_t
@@ -184,18 +184,18 @@ class MyTestCase(unittest.TestCase):
         )
         model.fit(X, a)
 
-        self.assertSetEqual(set(model.covariate_models_.keys()), {1, 2, 3, 4})
-        self.assertSetEqual(set(model.covariate_models_[1].keys()), {"x_1"})
-        self.assertEqual(model.covariate_models_[1]["x_1"].coef_.size, 1)  # intercept
-        self.assertEqual(model.covariate_models_[1]["x_1"].fit_intercept, False)
+        self.assertSetEqual(set(model.covariate_models_.keys()), {"x_1"})
+        self.assertSetEqual(set(model.covariate_models_["x_1"].keys()), {1, 2, 3, 4})
+        self.assertEqual(model.covariate_models_["x_1"][1].coef_.size, 1)  # intercept
+        self.assertEqual(model.covariate_models_["x_1"][1].fit_intercept, False)
         self.assertListEqual(
-            model.covariate_models_[1]["x_1"].feature_names_in_.tolist(),
+            model.covariate_models_["x_1"][1].feature_names_in_.tolist(),
             ["intercept"]
         )
-        self.assertEqual(model.covariate_models_[2]["x_1"].coef_.size, 2)  # treatment + t-1
-        self.assertEqual(model.covariate_models_[2]["x_1"].fit_intercept, True)
-        self.assertEqual(model.covariate_models_[3]["x_1"].coef_.size, 2)  # treatment + t-1
-        self.assertEqual(model.covariate_models_[4]["x_1"].coef_.size, 2)  # treatment + t-1
+        self.assertEqual(model.covariate_models_["x_1"][2].coef_.size, 2)  # treatment + t-1
+        self.assertEqual(model.covariate_models_["x_1"][2].fit_intercept, True)
+        self.assertEqual(model.covariate_models_["x_1"][3].coef_.size, 2)  # treatment + t-1
+        self.assertEqual(model.covariate_models_["x_1"][4].coef_.size, 2)  # treatment + t-1
 
         Xt = model.transform(X, a)
         self.assertTupleEqual(Xt.shape, (100, 4 + 4))  # X_t (with step1) + a_t
@@ -227,12 +227,12 @@ class MyTestCase(unittest.TestCase):
         )
         model.fit(X, a)
 
-        self.assertSetEqual(set(model.covariate_models_.keys()), {1, 2, 3, 4})
-        self.assertSetEqual(set(model.covariate_models_[1].keys()), {"x_1"})
-        self.assertEqual(model.covariate_models_[1]["x_1"].coef_.size, 1)  # baseline
-        self.assertEqual(model.covariate_models_[2]["x_1"].coef_.size, 3)  # baseline + A_t-1 + X_t-1
-        self.assertEqual(model.covariate_models_[3]["x_1"].coef_.size, 5)  # baseline + A_t-1 + A_t-2 + X_t-1 + X_t-2
-        self.assertEqual(model.covariate_models_[4]["x_1"].coef_.size, 5)  # baseline + A_t-1 + A_t-2 + X_t-1 + X_t-2
+        self.assertSetEqual(set(model.covariate_models_.keys()), {"x_1"})
+        self.assertSetEqual(set(model.covariate_models_["x_1"].keys()), {1, 2, 3, 4})
+        self.assertEqual(model.covariate_models_["x_1"][1].coef_.size, 1)  # baseline
+        self.assertEqual(model.covariate_models_["x_1"][2].coef_.size, 3)  # baseline + A_t-1 + X_t-1
+        self.assertEqual(model.covariate_models_["x_1"][3].coef_.size, 5)  # baseline + A_t-1 + A_t-2 + X_t-1 + X_t-2
+        self.assertEqual(model.covariate_models_["x_1"][4].coef_.size, 5)  # baseline + A_t-1 + A_t-2 + X_t-1 + X_t-2
 
         Xt = model.transform(X, a)
         self.assertTupleEqual(Xt.shape, (100, 1 + 4 + 4))  # baseline + X_t (with step1) + a_t
@@ -343,7 +343,8 @@ class MyTestCase(unittest.TestCase):
                 id_col="id", time_col="t",
             )
             model.fit(X, a)
-            self.assertSetEqual(set(model.covariate_models_.keys()), {2, 3, 4})
+            self.assertSetEqual(set(model.covariate_models_.keys()), {"x_1"})
+            self.assertSetEqual(set(model.covariate_models_["x_1"].keys()), {2, 3, 4})
 
             Xt = model.transform(X, a)
             for col in Xt.filter(regex="x_1", axis=1):
@@ -363,16 +364,16 @@ class MyTestCase(unittest.TestCase):
             )
             model.fit(X, a)
 
-            self.assertSetEqual(set(model.covariate_models_.keys()), {1, 2, 3, 4})
-            self.assertSetEqual(set(model.covariate_models_[1].keys()), {"x_1"})
-            self.assertEqual(model.covariate_models_[1]["x_1"].coef_.size, 1)  # intercept
-            self.assertEqual(model.covariate_models_[1]["x_1"].fit_intercept, False)
+            self.assertSetEqual(set(model.covariate_models_.keys()), {"x_1"})
+            self.assertSetEqual(set(model.covariate_models_["x_1"].keys()), {1, 2, 3, 4})
+            self.assertEqual(model.covariate_models_["x_1"][1].coef_.size, 1)  # intercept
+            self.assertEqual(model.covariate_models_["x_1"][1].fit_intercept, False)
             self.assertListEqual(
-                model.covariate_models_[1]["x_1"].feature_names_in_.tolist(),
+                model.covariate_models_["x_1"][1].feature_names_in_.tolist(),
                 ["intercept"]
             )
-            self.assertEqual(model.covariate_models_[2]["x_1"].coef_.size, 2)  # treatment + t-1
-            self.assertEqual(model.covariate_models_[2]["x_1"].fit_intercept, True)
+            self.assertEqual(model.covariate_models_["x_1"][2].coef_.size, 2)  # treatment + t-1
+            self.assertEqual(model.covariate_models_["x_1"][2].fit_intercept, True)
             Xt = model.transform(X, a)
             self.assertTupleEqual(Xt.shape, (100, 4 + 4))  # X_t (with step1) + a_t
 
@@ -389,7 +390,7 @@ class MyTestCase(unittest.TestCase):
         )
         model.fit(X, a)
         test_X = model._create_intercept_data(index=X["id"])
-        x1_model = model.covariate_models_[1]["x_1"]
+        x1_model = model.covariate_models_["x_1"][1]
         y_pred = model._OrthogonalRegression__estimator_predict(x1_model, test_X)
         expected_y_pred = LogisticRegression(
             random_state=0,

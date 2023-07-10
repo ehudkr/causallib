@@ -113,7 +113,7 @@ class OrthogonalRegression:
                         pass
 
                 cur_model.fit(cur_Xa, cur_y)
-                models[time_point][covariate] = cur_model
+                models[covariate][time_point] = cur_model
 
         self.covariate_models_ = models
         return self
@@ -205,7 +205,7 @@ class OrthogonalRegression:
                     break
                 cur_Xa = Xa.xs(time, level=self.time_col)
                 cur_Xa = cur_Xa.dropna(axis="columns", how="all")
-                cur_model = self.covariate_models_.get(time, {}).get(covariate)
+                cur_model = self.covariate_models_.get(covariate, {}).get(time)
                 if cur_model is None:
                     raise ValueError(
                         f"Covariate `{covariate}` at time `{time}` does not seem to be modelled. "
