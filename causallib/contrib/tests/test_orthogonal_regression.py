@@ -399,6 +399,26 @@ class MyTestCase(unittest.TestCase):
         with self.assertRaises(AssertionError):
             np.testing.assert_array_almost_equal(y_pred, 1 - expected_y_pred, decimal=4)
 
+    def test_pooled_time_model(self):
+        X, a, y = generate_multi_step_sim(
+            with_baseline=False, with_step1=False,
+        )
+        X, a = X.reset_index(), a.reset_index()
+        model = OrthogonalRegression(
+            covariate_models={"x_1": LinearRegression()},
+            id_col="id", time_col="t",
+            pool_time=True,
+        )
+        model.fit(X, a)
+        self.assertSetEqual(set(model.covariate_models_), {"x1"})
+        self.assertEqual(model.covariate_models_["x1"].coef_.size(), 2)  # treatment and baseline
+        # TODO: test the internal models
+        # TODO: compare with non-pooled (dimensions? same `a`? content??)
+        # TODO: test when the `y` is entirely missing at first.
+        # TODO: pool time with lag>1?
+        # TODO: test orthogonaliation?
+        self.assertTrue(False)
+
 #
 # if __name__ == '__main__':
 #     unittest.main()

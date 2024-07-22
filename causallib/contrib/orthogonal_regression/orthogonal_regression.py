@@ -62,7 +62,7 @@ class OrthogonalRegression:
         self.id_col = id_col
         self.time_col = time_col
         self.lag = lag
-        # self.pool_time = pool_time  # TODO: add a time-pooled model?
+        self.pool_time = pool_time
 
     def fit(
         self,
@@ -97,23 +97,36 @@ class OrthogonalRegression:
         # a-priori merging saves some duplicated wrangling, but creates edge cases (e.g., all-null predictors/targets)
         time_points = Xa.index.unique(level=self.time_col).sort_values()
         for covariate in self.covariate_models.keys():
-            for time_point in time_points:
-                cur_y = Y.xs(time_point, level=self.time_col)[covariate]
-                if cur_y.isna().all():
-                    # No data for `covariate` at this time-point.
-                    # Was probably added in the "outer" merge of `X` and `a`.
-                    break
-                cur_Xa = Xa.xs(time_point, level=self.time_col)
-                cur_Xa = cur_Xa.dropna(axis="columns", how="all")
+            if self.pool_time:
+                cur_Xa = Xa.copy()
+                cur_y = Y[covariate]  # TODO: remove times which are entirely missing?
+                # So that entirely missing times don't have impact:
+                nan_entire_time = Xa.groupby(self.time_col).transform(lambda x: x.isna().all())
+                cur_Xa = cur_Xa.mask(nan_entire_time, 0)
+                # To allow explicitly model time if needed:
+                cur_Xa = cur_Xa.reset_index(self.time_col)
                 cur_model = deepcopy(self.covariate_models[covariate])
-                if self._is_intercept_data(cur_Xa):
-                    try:
-                        cur_model.fit_intercept = False
-                    except AttributeError:
-                        pass
-
                 cur_model.fit(cur_Xa, cur_y)
-                models[covariate][time_point] = cur_model
+                models[covariate] = cur_model
+            else:
+                for time_point in time_points:
+                    cur_y = Y.xs(time_point, level=self.time_col)[covariate]
+                    if cur_y.isna().all():
+                        # No data for `covariate` at this time-point.
+                        # Was probably added in the "outer" merge of `X` and `a`.
+                        # TODO: might be redundant as it happens in `prepare_data`
+                        break
+                    cur_Xa = Xa.xs(time_point, level=self.time_col)
+                    cur_Xa = cur_Xa.dropna(axis="columns", how="all")
+                    cur_model = deepcopy(self.covariate_models[covariate])
+                    if self._is_intercept_data(cur_Xa):
+                        try:
+                            cur_model.fit_intercept = False
+                        except AttributeError:
+                            pass
+
+                    cur_model.fit(cur_Xa, cur_y)
+                    models[covariate][time_point] = cur_model
 
         self.covariate_models_ = models
         return self
@@ -198,24 +211,27 @@ class OrthogonalRegression:
         res = X.merge(a, on=["id", "t"], how="outer")
         time_points = Xa.index.unique(level=self.time_col).sort_values()
         for covariate in self.covariate_models.keys():
-            for time in time_points:
-                # TODO: then maybe change the structure to dict of tuple: estimator, rather than nested dict?
-                cur_y = Y.xs(time, level=self.time_col)[covariate]
-                if cur_y.isna().all():
-                    break
-                cur_Xa = Xa.xs(time, level=self.time_col)
-                cur_Xa = cur_Xa.dropna(axis="columns", how="all")
-                cur_model = self.covariate_models_.get(covariate, {}).get(time)
-                if cur_model is None:
-                    raise ValueError(
-                        f"Covariate `{covariate}` at time `{time}` does not seem to be modelled. "
-                        f"Probably was not seen during `fit`. "
-                        f"Available times: {list(self.covariate_models_.keys())}. "
-                        f"Available covariates: f{list(self.covariate_models_.get(time, {}).keys())}"
-                    )
-                cur_pred = self.__estimator_predict(cur_model, cur_Xa)
-                cur_resid = cur_y.values - cur_pred  # avoid assignment by Index
-                res.loc[res[self.time_col] == time, covariate] = cur_resid
+            if self.pool_time:
+                raise NotImplementedError
+            else:
+                for time in time_points:
+                    # TODO: then maybe change the structure to dict of tuple: estimator, rather than nested dict?
+                    cur_y = Y.xs(time, level=self.time_col)[covariate]
+                    if cur_y.isna().all():
+                        break
+                    cur_Xa = Xa.xs(time, level=self.time_col)
+                    cur_Xa = cur_Xa.dropna(axis="columns", how="all")
+                    cur_model = self.covariate_models_.get(covariate, {}).get(time)
+                    if cur_model is None:
+                        raise ValueError(
+                            f"Covariate `{covariate}` at time `{time}` does not seem to be modelled. "
+                            f"Probably was not seen during `fit`. "
+                            f"Available times: {list(self.covariate_models_.keys())}. "
+                            f"Available covariates: f{list(self.covariate_models_.get(time, {}).keys())}"
+                        )
+                    cur_pred = self.__estimator_predict(cur_model, cur_Xa)
+                    cur_resid = cur_y.values - cur_pred  # avoid assignment by Index
+                    res.loc[res[self.time_col] == time, covariate] = cur_resid
         return res
 
     def transform(
